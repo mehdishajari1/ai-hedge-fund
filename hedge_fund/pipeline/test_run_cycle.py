@@ -251,3 +251,31 @@ def test_analyst_error_propagates():
     with pytest.raises(ConnectionError):
         run_cycle(fund, "2024-06-03", SimBroker(cash=100_000.0),
                   FakeDataClient(CLOSES), UNIVERSE)
+
+# ---------------------------------------------------------------------------
+# Governance integration
+# ---------------------------------------------------------------------------
+
+def test_governance_is_recorded_and_allows_healthy_paper_execution():
+    from hedge_fund.governance import GovernanceControlPlane, Decision
+    fund = Fund(_spec(max_position_pct=1.0), models={"solo": [FakeAnalyst("a", views={"AAPL": 1.0})]})
+    g = GovernanceControlPlane.paper_trading_default("test-fund")
+    record = run_cycle(fund, "2024-06-03", SimBroker(cash=100_000.0), FakeDataClient({"AAPL": 200.0}), ["AAPL"], governance=g)
+    assert record.governance is not None
+    assert record.governance.authority_epoch == 1
+    assert record.governance.decisions
+    assert all(d.decision == Decision.ALLOW for d in record.governance.decisions)
+    assert record.fills
+
+
+def test_material_change_blocks_execution_but_preserves_proposed_orders_in_audit_record():
+    from hedge_fund.governance import GovernanceControlPlane, MaterialChange, Decision
+    fund = Fund(_spec(max_position_pct=1.0), models={"solo": [FakeAnalyst("a", views={"AAPL": 1.0})]})
+    broker = SimBroker(cash=100_000.0)
+    g = GovernanceControlPlane.paper_trading_default("test-fund")
+    g.apply_material_change(MaterialChange(change_type="model_substitution", dependency="model", description="unassessed model replacement"))
+    record = run_cycle(fund, "2024-06-03", broker, FakeDataClient({"AAPL": 200.0}), ["AAPL"], governance=g)
+    assert record.orders                    # proposed consequence remains auditable
+    assert record.fills == []               # but governance prevented execution
+    assert broker.positions() == {}
+    assert all(d.decision == Decision.DENY for d in record.governance.decisions)

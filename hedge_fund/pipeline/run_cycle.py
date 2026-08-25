@@ -40,6 +40,7 @@ from hedge_fund.pipeline.execution import build_orders
 from hedge_fund.pipeline.models import CycleRecord, StrategyRecord, TickerSkip
 from hedge_fund.portfolio.construction import blend_signals
 from hedge_fund.risk.limits import apply_limits
+from hedge_fund.governance import GovernanceControlPlane, GovernedExecutionGateway, GovernanceCycleRecord
 
 # How far back to look for the most recent close: covers weekends, holiday
 # clusters, and short trading halts without reaching into stale history.
@@ -52,6 +53,7 @@ def run_cycle(
     broker: Broker,
     data_client: DataClient,
     universe: list[str],
+    governance: GovernanceControlPlane | None = None,
 ) -> CycleRecord:
     """Run one tick of *fund* over *universe* as of *as_of* (YYYY-MM-DD).
 
@@ -108,7 +110,20 @@ def run_cycle(
     risk = apply_limits(netted, spec.risk)
 
     orders = build_orders(risk.weights, held, marks, equity_before)
-    fills: list[Fill] = [broker.place_order(o) for o in orders]
+
+    governance_record = None
+    if governance is None:
+        fills: list[Fill] = [broker.place_order(o) for o in orders]
+    else:
+        gateway = GovernedExecutionGateway(broker, governance)
+        governed_fills = [gateway.place_order(o) for o in orders]
+        fills = [f for f in governed_fills if f is not None]
+        governance_record = GovernanceCycleRecord(
+            actor_id=governance.authority.actor_id,
+            authority_epoch=governance.authority.epoch,
+            assurance=governance.assurance_snapshot(),
+            decisions=gateway.decisions,
+        )
 
     positions_after = {t: p.shares for t, p in broker.positions().items()}
     cash_after = broker.cash()
@@ -132,6 +147,7 @@ def run_cycle(
         positions=positions_after,
         cash=cash_after,
         nav=nav,
+        governance=governance_record,
     )
 
 

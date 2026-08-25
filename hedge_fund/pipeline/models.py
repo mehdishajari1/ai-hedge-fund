@@ -14,6 +14,7 @@ from hedge_fund.brokers.models import Fill, Order
 from hedge_fund.fund.spec import FundSpec
 from hedge_fund.models import Signal
 from hedge_fund.risk.limits import ClampEvent
+from hedge_fund.governance.models import GovernanceCycleRecord
 
 
 class TickerSkip(BaseModel):
@@ -55,3 +56,4 @@ class CycleRecord(BaseModel):
     positions: dict[str, int]           # signed shares after fills
     cash: float
     nav: float                          # cash + sum(shares * mark)
+    governance: GovernanceCycleRecord | None = None
