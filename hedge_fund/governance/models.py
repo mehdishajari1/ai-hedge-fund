@@ -36,6 +36,8 @@ class MaterialChange(BaseModel):
     change_type: str
     dependency: str
     description: str
+    previous_value: str | None = None
+    new_value: str | None = None
 
 class GovernanceDecision(BaseModel):
     action: str
@@ -50,3 +52,4 @@ class GovernanceCycleRecord(BaseModel):
     authority_epoch: int
     assurance: dict[str, AssuranceState]
     decisions: list[GovernanceDecision] = Field(default_factory=list)
+    material_changes: list[MaterialChange] = Field(default_factory=list)

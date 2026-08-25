@@ -123,6 +123,7 @@ def run_cycle(
             authority_epoch=governance.authority.epoch,
             assurance=governance.assurance_snapshot(),
             decisions=gateway.decisions,
+            material_changes=list(governance.material_changes),
         )
 
     positions_after = {t: p.shares for t, p in broker.positions().items()}

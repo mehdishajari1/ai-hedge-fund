@@ -10,6 +10,11 @@ class GovernanceControlPlane:
         self._baseline = deepcopy(authority)
         self.authority = deepcopy(authority)
         self.claims = {c.claim_id: c for c in claims}
+        # Last observed values for material dependencies. The first observation
+        # establishes a baseline; a subsequent value change creates a
+        # MaterialChange and can immediately contract authority.
+        self.dependency_values: dict[str, str] = {}
+        self.material_changes: list[MaterialChange] = []
 
     @classmethod
     def paper_trading_default(cls, fund_name: str, *, max_order_value: float | None = None):
@@ -29,6 +34,7 @@ class GovernanceControlPlane:
         return cls(authority, claims)
 
     def apply_material_change(self, change: MaterialChange) -> set[str]:
+        self.material_changes.append(change)
         affected = set()
         for claim in self.claims.values():
             if change.dependency in claim.dependencies:
@@ -38,6 +44,53 @@ class GovernanceControlPlane:
         if affected:
             self.recalculate_authority()
         return affected
+
+
+    def observe_dependency(
+        self, dependency: str, value: str, *, change_type: str, description: str | None = None,
+    ) -> MaterialChange | None:
+        """Observe a dependency and automatically trigger governance on change.
+
+        First observation establishes the approved/current baseline. A later
+        change is treated as material if any assurance claim depends on that
+        dependency. The change takes effect immediately by bumping authority
+        epoch through ``apply_material_change``.
+        """
+        previous = self.dependency_values.get(dependency)
+        self.dependency_values[dependency] = value
+        if previous is None or previous == value:
+            return None
+        change = MaterialChange(
+            change_type=change_type,
+            dependency=dependency,
+            description=description or f"{dependency} changed from {previous} to {value}",
+            previous_value=previous,
+            new_value=value,
+        )
+        self.apply_material_change(change)
+        return change
+
+    def observe_model(self, model_id: str) -> MaterialChange | None:
+        """Record the active reasoning model; substitution invalidates model assurance."""
+        return self.observe_dependency(
+            "model", model_id, change_type="model_substitution",
+            description=None,
+        )
+
+    def reauthorize_model(self, reason: str = "model evaluation and governance review passed") -> None:
+        """Explicitly restore model assurance after a model substitution.
+
+        This does not run an evaluation itself; callers should invoke it only
+        after the required evidence has actually been produced and accepted.
+        """
+        self.set_claim_healthy("MODEL_ASSURANCE", reason)
+
+    def clone_for_actor(self, actor_id: str) -> "GovernanceControlPlane":
+        """Copy current assurance/authority state for a concrete fund actor."""
+        clone = deepcopy(self)
+        clone._baseline.actor_id = actor_id
+        clone.authority.actor_id = actor_id
+        return clone
 
     def set_claim_healthy(self, claim_id: str, reason: str = "") -> None:
         claim = self.claims[claim_id]

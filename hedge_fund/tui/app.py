@@ -69,6 +69,7 @@ from hedge_fund.fund import (
 )
 from hedge_fund.models import Signal
 from hedge_fund.pipeline import CycleRecord, run_cycle
+from hedge_fund.governance import GovernanceControlPlane, AssuranceState
 from hedge_fund.pipeline.run_cycle import _MARK_LOOKBACK_DAYS
 from hedge_fund.tui.shared import (
     DEFAULT_CAPITAL,
@@ -162,6 +163,8 @@ class HomeScreen(Screen):
             models[0][1],
         )
         os.environ["HEDGE_FUND_LLM_MODEL"] = self._model_id
+        # First observation establishes the session's approved model baseline.
+        self.app.governance.observe_model(self._model_id)
         self._show_model()
         self.query_one("#home-menu", OptionList).focus()
 
@@ -173,6 +176,15 @@ class HomeScreen(Screen):
             return
         self._model_id = model_id
         os.environ["HEDGE_FUND_LLM_MODEL"] = model_id
+        change = self.app.governance.observe_model(model_id)
+        if change is not None:
+            self.notify(
+                "Reasoning model changed. MODEL_ASSURANCE is now unassured; "
+                "consequential execution authority is contracted until reauthorization.",
+                title="Material governance change",
+                severity="warning",
+                timeout=8,
+            )
         self._show_model()
 
     def action_set_key(self) -> None:
@@ -196,11 +208,15 @@ class HomeScreen(Screen):
     def _show_model(self) -> None:
         label = next((name for name, mid, _ in load_api_models()
                       if mid == self._model_id), self._model_id)
+        model_state = self.app.governance.claims["MODEL_ASSURANCE"].state
+        state_style = GREEN if model_state == AssuranceState.HEALTHY else RED
         self.query_one("#model-line", Static).update(
             Text.assemble(
                 ("agents reason with  ", MUTED),
                 (label, f"bold {GREEN}"),
                 (f"  {self._model_id}", MUTED),
+                ("   ·  governance ", MUTED),
+                (model_state.value, f"bold {state_style}"),
                 ("   ·  m to switch", MUTED),
             )
         )
@@ -1243,9 +1259,12 @@ class RunScreen(Screen):
 
             fund = Fund(spec)
             broker = SimBroker(cash=spec.capital)
+            governance = app.governance.clone_for_actor(f"fund:{spec.name}")
             with FDClient() as raw:
-                record = run_cycle(fund, as_of, broker, CachedDataClient(raw),
-                                   universe)
+                record = run_cycle(
+                    fund, as_of, broker, CachedDataClient(raw), universe,
+                    governance=governance,
+                )
 
             # Receipts, same shape as a backtest's: the run is recoverable,
             # and it's what the fund's history pane reads.
@@ -2092,6 +2111,10 @@ class HedgeFundApp(App):
     BINDINGS = [Binding("ctrl+c", "quit", "quit", priority=True, show=False)]
 
     def on_mount(self) -> None:
+        # One session-level control plane observes material dependency changes
+        # such as reasoning-model substitution. Fund runs clone this state so
+        # a change seen in the UI affects the very next consequence boundary.
+        self.governance = GovernanceControlPlane.paper_trading_default("interactive-session")
         # Saved keys become environment variables before any screen builds an
         # agent. Anything already exported wins — see hedge_fund/tui/keys.py.
         apply_credentials()

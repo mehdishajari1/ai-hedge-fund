@@ -44,3 +44,44 @@ def test_stale_epoch_is_preempted():
     g.apply_material_change(MaterialChange(change_type="monitoring_failure", dependency="monitoring", description="telemetry unavailable"))
     with pytest.raises(AuthorityPreempted):
         g.assert_epoch(epoch)
+
+def test_first_model_observation_establishes_baseline_without_contracting_authority():
+    g = gov()
+    assert g.observe_model("claude-opus-5") is None
+    assert g.claims["MODEL_ASSURANCE"].state == AssuranceState.HEALTHY
+    assert "paper_order" in g.authority.allowed_actions
+    assert g.authority.epoch == 1
+
+
+def test_observed_model_substitution_is_automatic_material_change():
+    g = gov()
+    g.observe_model("claude-opus-5")
+    change = g.observe_model("claude-sonnet-5")
+    assert change is not None
+    assert change.change_type == "model_substitution"
+    assert change.previous_value == "claude-opus-5"
+    assert change.new_value == "claude-sonnet-5"
+    assert g.claims["MODEL_ASSURANCE"].state == AssuranceState.UNASSURED
+    assert "paper_order" not in g.authority.allowed_actions
+    assert g.authority.epoch == 2
+
+
+def test_model_reauthorization_restores_authority_but_preserves_change_history():
+    g = gov()
+    g.observe_model("claude-opus-5")
+    g.observe_model("claude-sonnet-5")
+    g.reauthorize_model("regression evaluation passed")
+    assert g.claims["MODEL_ASSURANCE"].state == AssuranceState.HEALTHY
+    assert "paper_order" in g.authority.allowed_actions
+    assert g.authority.epoch == 3
+    assert len(g.material_changes) == 1
+
+
+def test_clone_for_actor_preserves_assurance_state_and_model_change():
+    g = gov()
+    g.observe_model("claude-opus-5")
+    g.observe_model("claude-sonnet-5")
+    clone = g.clone_for_actor("fund:demo")
+    assert clone.authority.actor_id == "fund:demo"
+    assert clone.claims["MODEL_ASSURANCE"].state == AssuranceState.UNASSURED
+    assert clone.material_changes[0].new_value == "claude-sonnet-5"
