@@ -1,0 +1,16 @@
+tgp_version: '0.1'
+profile: {id: conservative-equity-001}
+authority:
+  default: deny
+  actions:
+    allowed: [analyze_security, generate_recommendation, propose_order, place_order, cancel_order]
+    hard_prohibited: [withdraw_cash, change_risk_policy, modify_credentials]
+  scope:
+    asset_classes: {allowed: [equity]}
+    symbols: {allowed: [NVDA, MSFT, AAPL]}
+environments:
+  sandbox: {capability_discovery: true, external_effects: isolated}
+  assurance-staging: {capability_evaluation: true, external_effects: simulated}
+  operational: {default_deny: true}
+capability_promotion:
+  require: [evaluation, assurance, principal_approval, explicit_profile_update]

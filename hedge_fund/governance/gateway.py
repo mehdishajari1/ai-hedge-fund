@@ -22,6 +22,13 @@ from hedge_fund.brokers.protocol import Broker
 from .control import GovernanceControlPlane
 from .models import Decision, GovernanceDecision
 
+from .tgp import (
+    ActionRequest,
+    AuthorizationResult,
+    GovernanceStage,
+    TGPAuthorizer,
+    TGPDecision,
+)
 
 class GovernedExecutionGateway:
     """Policy Enforcement Point immediately before broker execution.
@@ -49,6 +56,8 @@ class GovernedExecutionGateway:
         governance: GovernanceControlPlane,
         *,
         live: bool = False,
+        tgp: TGPAuthorizer | None = None,
+        stage: GovernanceStage = GovernanceStage.OPERATIONAL,
     ):
         """Create a governed broker-execution boundary.
 
@@ -74,10 +83,24 @@ class GovernedExecutionGateway:
         self.governance = governance
         self.live = live
 
+        self.tgp = tgp
+        self.stage = stage
+
         # Preserve every governance decision made at this enforcement point.
         # run_cycle() copies these decisions into GovernanceCycleRecord so the
         # authorization behavior is auditable after the cycle completes.
         self.decisions: list[GovernanceDecision] = []
+
+        # TGP decisions are kept separately from ACCA/governance decisions.
+        #
+        # TGP answers:
+        #     "Was this type of consequential action explicitly granted?"
+        #
+        # ACCA answers:
+        #     "Does that granted authority remain justified now?"
+        #
+        # Keeping the records separate preserves that distinction in the audit trail.
+        self.tgp_decisions: list[TGPDecision] = []
 
     def place_order(self, order: Order) -> Fill | None:
         """Authorize and, when permitted, execute an AIHF-proposed order.
@@ -110,6 +133,44 @@ class GovernedExecutionGateway:
                 changes after the authorization decision but before the
                 irreversible broker commit.
         """
+
+        # ---------------------------------------------------------------
+        # TGP Declared-Authority Boundary
+        # ---------------------------------------------------------------
+        # TGP applies closed-world/default-deny semantics before ACCA.
+        #
+        # Possession of a broker-capable Order does not imply that the
+        # principal granted authority to perform the corresponding action.
+        #
+        # For the current AIHF Order model, place_order represents an equity
+        # order. More expressive instrument-specific requests (for example,
+        # options) will be exercised separately in the S1 experiment.
+        if self.tgp is not None:
+            symbol = getattr(
+                order,
+                "ticker",
+                getattr(order, "symbol", None),
+            )
+
+            tgp_request = ActionRequest(
+                action="place_order",
+                stage=self.stage,
+                asset_class="equity",
+                symbol=symbol,
+            )
+
+            tgp_decision = self.tgp.authorize(tgp_request)
+            self.tgp_decisions.append(tgp_decision)
+
+            # Closed-world operational semantics:
+            #
+            #     not explicitly authorized -> DENY
+            #
+            # A TGP denial never reaches ACCA because the principal never
+            # granted the requested authority in the first place.
+            if tgp_decision.result != AuthorizationResult.ALLOW:
+                return None
+
 
         # ---------------------------------------------------------------
         # Policy Decision
