@@ -8,6 +8,80 @@ Note: the system does not actually make any trades.
 
 [![Twitter Follow](https://img.shields.io/twitter/follow/virattt?style=social)](https://twitter.com/virattt)
 
+
+## ACCA Research Artifact
+
+This repository contains the reference implementation and experimental
+artifacts accompanying the paper:
+
+**Assurance-Conditioned Continuous Authorization for Autonomous AI Agents**
+
+The ACCA work extends the AI Hedge Fund codebase with a governance control
+plane for assurance-conditioned authority in autonomous AI agents. The
+trading application provides one evaluation domain, while a Security
+Operations Governance Profile (SGP) provides a second cross-domain
+evaluation.
+
+### Frozen experimental checkpoint
+
+The experimental results reported in the paper correspond to:
+
+- **Tag:** `acca-paper-v1.0`
+- **Commit:** `1e42dbfb727a8ae647665f0e2f2f3b955e80025a`
+- **Python:** 3.11.0
+- **Poetry:** 2.4.1
+- **Governance test suite:** 100 passing tests
+
+### Artifact structure
+
+The ACCA implementation and experiments are located under:
+
+- `hedge_fund/governance/` — ACCA governance implementation,
+  governance profiles, evidence handling, materiality detection,
+  authority management, and experimental scenarios.
+- `hedge_fund/tests/governance/` — ACCA, TGP, SGP, and experimental
+  scenario tests.
+
+### Reproducing the reported governance tests
+
+Clone the repository and check out the frozen experimental artifact:
+
+    git clone https://github.com/mehdishajari1/ai-hedge-fund.git
+    cd ai-hedge-fund
+    git checkout acca-paper-v1.0
+
+Install the frozen dependencies:
+
+    poetry install
+
+Then run the governance test suite from the `hedge_fund` directory:
+
+    cd hedge_fund
+    poetry run python -m pytest governance tests/governance -q
+
+Expected result:
+
+    100 passed
+
+### Reproducing the ACCA microbenchmark
+
+From the `hedge_fund` directory:
+
+    poetry run python -m governance.benchmark_acca
+
+The benchmark measures local in-process governance operations and excludes
+model, network, broker, SIEM/EDR, database, and disk latency. Absolute
+timings therefore depend on the execution environment and should not be
+interpreted as end-to-end agent latency.
+
+### Paper
+
+M. Shajari, *Assurance-Conditioned Continuous Authorization for Autonomous
+AI Agents*.
+
+The arXiv link will be added after publication.
+
+
 ## Disclaimer
 
 This project is for **educational and research purposes only**.
