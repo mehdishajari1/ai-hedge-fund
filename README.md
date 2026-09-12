@@ -6,6 +6,32 @@ This is a proof of concept for an AI-powered hedge fund. The goal of this projec
 
 Note: the system does not actually make any trades.
 
+## ACCA Governance Research Artifact
+
+This repository also contains the research implementation used to evaluate
+**Assurance-Conditioned Continuous Authorization (ACCA)** for autonomous AI
+agents.
+
+The governance layer integrates runtime assurance and authorization with the
+AI Hedge Fund execution path. In the Trading Governance Profile (TGP),
+governance is enforced at the consequence boundary between proposed orders
+and broker execution. The implementation includes assurance evidence,
+material-change detection, authority derivation, authority epochs, and
+policy-enforcement mechanisms.
+
+The cleaned ACCA Paper 1 artifact contains **93 non-duplicated governance
+tests**: 25 domain-independent ACCA/core tests, 48 TGP/trading tests, and
+20 preliminary synthetic Security Governance Profile (SGP/SOC) tests.
+The SGP/SOC tests are exploratory software tests and are not evidence of
+operational SOC validation or empirical cross-domain generalization.
+
+For the governance architecture, integration points, execution path, and
+reproduction instructions, see
+[`GOVERNANCE_INTEGRATION.md`](GOVERNANCE_INTEGRATION.md).
+
+The reproducible paper artifact is frozen under the Git tag
+`acca-paper-v1.1`.
+
 [![Twitter Follow](https://img.shields.io/twitter/follow/virattt?style=social)](https://twitter.com/virattt)
 
 ## Disclaimer
@@ -24,75 +50,3 @@ By using this software, you agree to use it solely for learning purposes.
 
 ```bash
 pipx install aihf
-```
-
-(or `uv tool install aihf`, or `pip install aihf` into an environment of your choice)
-
-Then run it from anywhere:
-
-```bash
-aihf
-```
-
-### API keys
-
-The app asks for keys the first time it needs them and saves them to `~/.hedge-fund/.env` — nothing to configure up front. It needs:
-
-- A [Financial Datasets](https://financialdatasets.ai) API key, for prices, fundamentals, and earnings.
-- One LLM API key for the LLM-powered alpha models. Supported providers: Anthropic, OpenAI, DeepSeek, Google, xAI, Kimi.
-
-Keys exported in your shell always win over the saved file.
-
-## How to Run
-
-### Interactive app
-
-```bash
-aihf
-```
-
-With no arguments, this launches the interactive terminal app. Build a fund — pick stocks, strategies, rebalance cadence — or backtest a saved fund and watch its equity curve draw against its benchmark. Funds you build are saved as mandate files in `~/.hedge-fund/mandates/`.
-
-### Non-interactive
-
-Run one fund cycle from a mandate file. The full cycle record prints to stdout as JSON; a short human summary goes to stderr:
-
-```bash
-aihf ~/.hedge-fund/mandates/example.yaml --tickers AAPL,MSFT
-```
-
-Backtest the mandate over history at its rebalance cadence:
-
-```bash
-aihf ~/.hedge-fund/mandates/example.yaml --tickers AAPL,MSFT --backtest
-```
-
-A mandate is the desk — strategies, staff, risk, capital, cadence — and never names tickers; `--tickers` says what to point it at for this run.
-
-## Development
-
-```bash
-git clone https://github.com/virattt/ai-hedge-fund.git
-cd ai-hedge-fund
-poetry install
-poetry run aihf
-poetry run pytest hedge_fund
-```
-
-## How to Contribute
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-**Important**: Please keep your pull requests small and focused. This will make it easier to review and merge.
-
-## Feature Requests
-
-If you have a feature request, please open an [issue](https://github.com/virattt/ai-hedge-fund/issues) and make sure it is tagged with `enhancement`.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.

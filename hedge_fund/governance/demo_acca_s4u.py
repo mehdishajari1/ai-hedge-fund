@@ -1,15 +1,15 @@
 """S4-U: Novel-regime / uncertainty applicability experiment.
 
 Demonstrates that an unchanged agent can lose and later regain
-consequential authority when the operating context moves outside,
-and then back inside, the conditions represented by its assurance
-evidence.
+consequential authority when the operating context moves beyond,
+and then returns to, the conditions for which its existing assurance
+evidence is applicable.
 
 The experiment does not treat an uncertainty or novelty detector as
 an authorization oracle. The detector's output is represented as
 authority-relevant context. ACCA determines whether existing evidence
-remains applicable and derives authority through the assurance graph
-and stakeholder risk policy.
+remains applicable and derives effective authority through the
+assurance graph and stakeholder risk policy.
 """
 
 from __future__ import annotations
